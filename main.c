@@ -19,6 +19,18 @@ int still_running = TRUE;
 void signal_handler(int sig) {
     still_running = FALSE;
 }
+work_queue_item *head = NULL;
+work_queue_item *tail = NULL;
+pthread_mutex_t work_mutex;
+pthread_mutex_t work_cond;
+int queue_count = 0;
+
+//Carrie
+struct work_queue_item {
+	int sock;
+	struct work_queue_item *previous;	
+	struct work_queue_item *next;
+};
 
 
 void usage(const char *progname) {
@@ -28,11 +40,13 @@ void usage(const char *progname) {
     exit(0);
 }
 
+//Carrie and Shreeya
 void runserver(int numthreads, unsigned short serverport) {
     //////////////////////////////////////////////////
-
+    
     // create your pool of threads here
-
+    
+ 
     //////////////////////////////////////////////////
     
     
@@ -75,6 +89,60 @@ void runserver(int numthreads, unsigned short serverport) {
             * Don't forget to close the socket (in the worker thread)
             * when you're done.
             */
+            
+            
+            
+            
+            
+            /*************************************
+            
+            
+            //SHREEYA!!  We can delete everything I've written... was trying to get 
+            //a start on the linked list, but not sure I'm implementing it in the right place...
+            //have a look at the man page for pthread_create... at the bottom there is some
+            //potentially useful code for make a bunch of threads.  Should we have an array of
+            //them as we will always have a set number of threads (its the processes that
+            //are variable)?
+            
+         
+            
+            ************************************/
+            
+            
+            /*this will be a linked lists of the processes that need threads. Once a thread is
+    freed from its process, then we will take the process off the tail.  When a new process
+    needs to be added, we can add to the head.
+    */
+   	 
+   	 //adding a process to the waiting work_queue
+    	(work_queue_item* ) newitem = (work_queue_item*)malloc(sizeof(work_queue_item));
+    	newitem.sock = new_sock; 
+  	if(head==NULL && tail==NULL) { //1st node
+    		head = newitem;
+    		head.next = NULL;
+    		head.previous = NULL;
+    	}
+    	else if(head==NULL && tail!=NULL) {
+    		printf("Pointer error.\n");			
+    		return;
+    		//this should really never happen, but I'd figure I'd catch it just in case
+    	}
+    	else if(head!=NULL && tail==NULL) { //only 1 node so far
+    		newitem.next = head;
+    		newitem.previous = NULL;
+    		head = newitem;
+    		tail = newitem.next;
+    		tail.previous = head; //using previous so can change tail when necessary
+    	}
+    	else { //otherwise, add to head
+    		newitem.next = head;
+    		head.previous = newitem;
+    		head = newitem;
+    	}
+    	
+    	//create loop to cycle through work_queue_item. When thread is done, takes tail
+    	//of linked list, shifts tail to previous.
+
            ////////////////////////////////////////////////////////
 
 
