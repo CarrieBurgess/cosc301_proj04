@@ -45,6 +45,21 @@ void runserver(int numthreads, unsigned short serverport) {
     //////////////////////////////////////////////////
     
     // create your pool of threads here
+    /*
+    before creating threads, need to create/ initialize condition variable,
+    mutex, and whatever other shared data worker threads need to wait on
+    	--> intiially, want workers to get started up then get stuck on some
+    	sort of condition variable
+    	 
+    want array of pthread_t to create pthreads
+    when create each of the threads, need seperate function for 
+    them to start up in
+    	-> this needs a particular signature to match pthread_t
+    	prolly takes void * and returns void *
+    	look at lab for creating threads
+    when go through for loop to create x number of worker threads
+    
+    */
     
  
     //////////////////////////////////////////////////
@@ -142,6 +157,18 @@ void runserver(int numthreads, unsigned short serverport) {
     	
     	//create loop to cycle through work_queue_item. When thread is done, takes tail
     	//of linked list, shifts tail to previous.
+    	
+    	/*
+    	after add to queue, kick a thread awake and pass it off
+    	will have to write code to implement what worker (thread) does
+    	*not passing socket directly, putting in linked list
+    	
+    	after main thread adds item to queue, signals worker queue.
+    	worker queue grabs mutex, grabs something off linked list (removes it)
+    	takes socket, reads request/ does it, then goes back and waits
+    	
+    	key is to coordinate producer consumer 
+    	*/
 
            ////////////////////////////////////////////////////////
 
