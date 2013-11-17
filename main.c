@@ -19,10 +19,11 @@ int still_running = TRUE;
 void signal_handler(int sig) {
     still_running = FALSE;
 }
-work_queue_item *head = NULL;
-work_queue_item *tail = NULL;
-pthread_mutex_t work_mutex;
-pthread_mutex_t work_cond;
+struct work_queue_item *head = NULL;
+struct work_queue_item *tail = NULL;
+pthread_mutex_t mucheck;
+//pthread_mutex_t work_mutex;
+//pthread_mutex_t work_cond;
 int queue_count = 0;
 
 //Carrie
@@ -61,6 +62,15 @@ void runserver(int numthreads, unsigned short serverport) {
     
     */
     
+    pthread_t thread_arr[numthreads];
+    //might want a different struct that has pthread_t as a parameter in addition
+    //to a check to see if it currently has a process or is free to take a new one/ pass
+    //condition variable (which I also still need to initialize)
+    int i = 0;
+    for(;i<numthreads; i++) {
+    	//thread_arr[i] = pthread_create(...) Not sure what to put here 
+    }
+    //hypothetically, threads have now been initialized (with proper locks if need be)
  
     //////////////////////////////////////////////////
     
@@ -104,25 +114,7 @@ void runserver(int numthreads, unsigned short serverport) {
             * Don't forget to close the socket (in the worker thread)
             * when you're done.
             */
-            
-            
-            
-            
-            
-            /*************************************
-            
-            
-            //SHREEYA!!  We can delete everything I've written... was trying to get 
-            //a start on the linked list, but not sure I'm implementing it in the right place...
-            //have a look at the man page for pthread_create... at the bottom there is some
-            //potentially useful code for make a bunch of threads.  Should we have an array of
-            //them as we will always have a set number of threads (its the processes that
-            //are variable)?
-            
-         
-            
-            ************************************/
-            
+ 
             
             /*this will be a linked lists of the processes that need threads. Once a thread is
     freed from its process, then we will take the process off the tail.  When a new process
@@ -130,12 +122,14 @@ void runserver(int numthreads, unsigned short serverport) {
     */
    	 
    	 //adding a process to the waiting work_queue
-    	(work_queue_item* ) newitem = (work_queue_item*)malloc(sizeof(work_queue_item));
-    	newitem.sock = new_sock; 
+   	 //**Should I make this a loop for a series of processes?  Currently only accepting
+   	 //1 process at a time...
+    	struct work_queue_item * newitem = (struct work_queue_item *)malloc(sizeof(struct work_queue_item));
+    	newitem->sock = new_sock; 
   	if(head==NULL && tail==NULL) { //1st node
     		head = newitem;
-    		head.next = NULL;
-    		head.previous = NULL;
+    		head->next = NULL;
+    		head->previous = NULL;
     	}
     	else if(head==NULL && tail!=NULL) {
     		printf("Pointer error.\n");			
@@ -143,17 +137,20 @@ void runserver(int numthreads, unsigned short serverport) {
     		//this should really never happen, but I'd figure I'd catch it just in case
     	}
     	else if(head!=NULL && tail==NULL) { //only 1 node so far
-    		newitem.next = head;
-    		newitem.previous = NULL;
+    		newitem->next = head;
+    		newitem->previous = NULL;
     		head = newitem;
-    		tail = newitem.next;
-    		tail.previous = head; //using previous so can change tail when necessary
+    		tail = newitem->next;
+    		tail->previous = head; //using previous so can change tail when necessary
     	}
     	else { //otherwise, add to head
-    		newitem.next = head;
-    		head.previous = newitem;
+    		newitem->next = head;
+    		head->previous = newitem;
     		head = newitem;
     	}
+    	//process has now been added to queue waiting for worker.
+    	
+    	
     	
     	//create loop to cycle through work_queue_item. When thread is done, takes tail
     	//of linked list, shifts tail to previous.
@@ -184,7 +181,11 @@ void runserver(int numthreads, unsigned short serverport) {
 int main(int argc, char **argv) {
     unsigned short port = 3000;
     int num_threads = 1;
-
+   // struct work_queue_item *head;
+   // struct work_queue_item *tail;
+   int pthread_mutex_init(pthread_mutex_t &mucheck, NULL); //initialize mutex to lock threads as
+   //they are created
+   
     int c;
     while (-1 != (c = getopt(argc, argv, "hp:t:"))) {
         switch(c) {
@@ -209,7 +210,7 @@ int main(int argc, char **argv) {
     }
 
     runserver(num_threads, port);
-    
+    pthread_mutex_destroy(&mucheck);
     fprintf(stderr, "Server done.\n");
     exit(0);
 }
