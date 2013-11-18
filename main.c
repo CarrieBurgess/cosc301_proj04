@@ -21,7 +21,7 @@ void signal_handler(int sig) {
 }
 struct work_queue_item *head = NULL;
 struct work_queue_item *tail = NULL;
-pthread_mutex_t mucheck;
+pthread_mutex_t mucheck; 
 //pthread_mutex_t work_mutex;
 //pthread_mutex_t work_cond;
 int queue_count = 0;
@@ -33,12 +33,80 @@ struct work_queue_item {
 	struct work_queue_item *next;
 };
 
-
 void usage(const char *progname) {
     fprintf(stderr, "usage: %s [-p port] [-t numthreads]\n", progname);
     fprintf(stderr, "\tport number defaults to 3000 if not specified.\n");
     fprintf(stderr, "\tnumber of threads is 1 by default.\n");
     exit(0);
+}
+
+void add_to_queue(int new_sock) {
+	struct work_queue_item * newitem = (struct work_queue_item *)malloc(sizeof(struct work_queue_item));
+    	newitem->sock = new_sock; 
+  	if(head==NULL && tail==NULL) { //1st node
+    		head = newitem;
+    		head->next = NULL;
+    		head->previous = NULL;
+    		tail = head;
+    	}
+    	else if(head==NULL && tail!=NULL) {
+    		printf("Pointer error.\n");			
+    		return;
+    		//this should really never happen, but I'd figure I'd catch it just in case
+    	}
+    	else if(head!=NULL && head==tail) { //only 1 node so far
+    		newitem->next = head;
+    		newitem->previous = NULL;
+    		head = newitem;
+    		tail = newitem->next;
+    		tail->previous = head; //using previous so can change tail when necessary
+    	}
+    	else { //otherwise, add to head
+    		newitem->next = head;
+    		head->previous = newitem;
+    		head = newitem;
+    	}
+}
+
+void worker(void) {
+	if(tail==NULL) {
+		//put thread to sleep
+	}
+	else { //a connection is waiting in the queue
+		pthread_mutex_lock(&mucheck);
+		struct work_queue_item * temp = tail;
+		if(head==tail) { //there is only 1 node
+			head->next= NULL;
+			head->previous=NULL;
+			tail->next = NULL;
+			tail->previous= NULL;
+			head = NULL;
+			tail = NULL;
+		}
+		else if(tail->previous == head) { //there are only two nodes
+			tail->previous = NULL;
+			tail->next = NULL;
+			tail = head;
+			head->previous = NULL;
+			head->next = NULL;
+		}
+		else {
+			tail = tail->previous;
+			tail->next = NULL;
+		}
+		//node has now been removed
+		char * reqbuffer;
+		int buffsize = 1024;
+		int err = getrequest(temp->sock, reqbuffer, buffsize);
+		if(err==-1) {
+			printf("Couldn't obtain file.\n");
+		}
+		
+		//now need thread to do something with reqbuffer
+		//add to output thing
+		//put thread back to sleep when finished
+		pthread_mutex_unlock(&mucheck);
+	}
 }
 
 //Carrie and Shreeya
@@ -63,12 +131,9 @@ void runserver(int numthreads, unsigned short serverport) {
     */
     
     pthread_t thread_arr[numthreads];
-    //might want a different struct that has pthread_t as a parameter in addition
-    //to a check to see if it currently has a process or is free to take a new one/ pass
-    //condition variable (which I also still need to initialize)
     int i = 0;
     for(;i<numthreads; i++) {
-    	//thread_arr[i] = pthread_create(...) Not sure what to put here 
+    	pthread_create(&thread_arr[i], NULL, &worker, NULL);
     }
     //hypothetically, threads have now been initialized (with proper locks if need be)
  
@@ -114,47 +179,23 @@ void runserver(int numthreads, unsigned short serverport) {
             * Don't forget to close the socket (in the worker thread)
             * when you're done.
             */
- 
             
-            /*this will be a linked lists of the processes that need threads. Once a thread is
-    freed from its process, then we will take the process off the tail.  When a new process
-    needs to be added, we can add to the head.
-    */
-   	 
-   	 //adding a process to the waiting work_queue
+            //adding a process to the waiting work_queue
    	 //**Should I make this a loop for a series of processes?  Currently only accepting
    	 //1 process at a time...
-    	struct work_queue_item * newitem = (struct work_queue_item *)malloc(sizeof(struct work_queue_item));
-    	newitem->sock = new_sock; 
-  	if(head==NULL && tail==NULL) { //1st node
-    		head = newitem;
-    		head->next = NULL;
-    		head->previous = NULL;
-    	}
-    	else if(head==NULL && tail!=NULL) {
-    		printf("Pointer error.\n");			
-    		return;
-    		//this should really never happen, but I'd figure I'd catch it just in case
-    	}
-    	else if(head!=NULL && tail==NULL) { //only 1 node so far
-    		newitem->next = head;
-    		newitem->previous = NULL;
-    		head = newitem;
-    		tail = newitem->next;
-    		tail->previous = head; //using previous so can change tail when necessary
-    	}
-    	else { //otherwise, add to head
-    		newitem->next = head;
-    		head->previous = newitem;
-    		head = newitem;
-    	}
-    	//process has now been added to queue waiting for worker.
-    	
-    	
-    	
-    	//create loop to cycle through work_queue_item. When thread is done, takes tail
-    	//of linked list, shifts tail to previous.
-    	
+            add_to_queue(new_sock);
+            //process has now been added to queue waiting for worker.
+            i = 0;
+            int thread_available = 0;
+            for(;i<numthreads; i++) { //if a thread is immediately available
+            	//if arr_threads[i] is waiting, unlock it and exit this loop
+            	//in same if statement, make thread_available=1;
+            }
+            if(thread_available == 1) {
+            	//pop tail off queue
+            	//give arr_threads[i] the socket from the tail
+            }
+
     	/*
     	after add to queue, kick a thread awake and pass it off
     	will have to write code to implement what worker (thread) does
@@ -183,9 +224,9 @@ int main(int argc, char **argv) {
     int num_threads = 1;
    // struct work_queue_item *head;
    // struct work_queue_item *tail;
-   int pthread_mutex_init(pthread_mutex_t &mucheck, NULL); //initialize mutex to lock threads as
+   //pthread_mutex_t mucheck;
+   pthread_mutex_init(&mucheck, NULL); //initialize mutex to lock threads as
    //they are created
-   
     int c;
     while (-1 != (c = getopt(argc, argv, "hp:t:"))) {
         switch(c) {
