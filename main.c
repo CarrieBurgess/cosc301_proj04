@@ -98,9 +98,15 @@ void worker(void) {
 		char * reqbuffer;
 		int buffsize = 1024;
 		int err = getrequest(temp->sock, reqbuffer, buffsize);
+		//is reqbuffer malloced?  do we have to free it? ******************************
 		if(err==-1) {
 			printf("Couldn't obtain file.\n");
 		}
+		//char * present_dir = pwd;
+		//int tot_size = strlen(reqbuffer) + strlen(present_dir);
+		int err2 = fopen(reqbuffer);
+		//if can open, concat with 202
+		//if can't, concat with 404
 		
 		//now need thread to do something with reqbuffer
 		//add to output thing
