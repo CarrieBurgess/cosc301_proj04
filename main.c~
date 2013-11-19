@@ -23,7 +23,7 @@ struct work_queue_item *head = NULL;
 struct work_queue_item *tail = NULL;
 pthread_mutex_t mucheck; 
 pthread_cond_t thread, connection;
-
+FILE * log = NULL;
 int queue_count = 0;
 
 int thread_count = 0;
@@ -272,10 +272,13 @@ int main(int argc, char **argv) {
         }
     }
 	max_threads = num_threads;
+
+	log = fopen("weblog.txt","a");	
     runserver(num_threads, port);
     pthread_mutex_destroy(&mucheck);
     pthread_cond_destroy(&connection);    
 	pthread_cond_destroy(&thread);
     fprintf(stderr, "Server done.\n");
+	fclose(log);
     exit(0);
 }
