@@ -23,7 +23,7 @@ struct work_queue_item *head = NULL;
 struct work_queue_item *tail = NULL;
 pthread_mutex_t mucheck; 
 pthread_cond_t thread, connection;
-FILE * log = NULL;
+FILE * log_file = NULL;
 int queue_count = 0;
 
 int thread_count = 0;
@@ -32,6 +32,7 @@ int max_threads;
 //Carrie
 struct work_queue_item {
 	int sock;
+    struct sockaddr_in client_address; /////////////CARRIE... i added this for the log file..
 	struct work_queue_item *previous;	
 	struct work_queue_item *next;
 };
@@ -43,9 +44,10 @@ void usage(const char *progname) {
     exit(0);
 }
 
-void add_to_queue(int new_sock) {
+void add_to_queue(int new_sock, struct sockaddr_in input_client_address) {
 	struct work_queue_item * newitem = (struct work_queue_item *)malloc(sizeof(struct work_queue_item));
     	newitem->sock = new_sock; 
+		newitem->client_address = input_client_address; ////added for log file
   	if(head==NULL && tail==NULL) { //1st node
     		head = newitem;
     		head->next = NULL;
@@ -117,21 +119,27 @@ void * worker(void * arg) {
 		int filename_length = strlen(reqbuffer);
 		if (file==NULL) { //cannot open, concat with 404--> make a fxn that does this
 			int http_length = strlen(HTTP_404);
+			time_t now = time(NULL);
 			senddata(temp->sock, HTTP_404, http_length);
+            fprintf(log_file, "%s:%d  %s  'GET %s'  %d %d\n", inet_ntoa((temp->client_address).sin_addr), ntohs((temp->client_address).sin_port), ctime(&now), reqbuffer, 404, http_length);
 		}
 		else { //concat with 202.. send input from file to be concatenated
 			fseek(file, 0, SEEK_END);
 			int file_size = ftell(file);
-			int http_length = strlen(HTTP_200, file_size);
+			char * http = HTTP_200; ///shouldn't be this but i just changed in into this cuz i didn't want error during run.. the program gets hanged so we have to debug it...
+			//int http_length = strlen(HTTP_200, file_size);
+			int http_length = strlen(http);
 			rewind(file);	
 			char * file_info = malloc(file_size*sizeof(char));
 			fread(file_info, sizeof(char), file_size, file);
 			fclose(file);
 			int total_size = file_size + http_length;
 			char * final_string = malloc(total_size*sizeof(char));
-			strcpy(final_string, (HTTP_200, file_size));
+			strcpy(final_string, http);
 			strcat(final_string, file_info);
+			time_t now = time(NULL);
 			senddata(temp->sock, final_string, total_size);
+			fprintf(log_file, "%s:%d  %s  'GET %s'  %d %d\n", inet_ntoa((temp->client_address).sin_addr), ntohs((temp->client_address).sin_port), ctime(&now), reqbuffer, 200, total_size);
 			free(file_info);
 			free(final_string);
 		}
@@ -145,6 +153,7 @@ void * worker(void * arg) {
 		thread_count--;
 		pthread_mutex_unlock(&mucheck);	
 	}
+	return NULL;
 }
 
 //Carrie and Shreeya
@@ -220,7 +229,7 @@ void runserver(int numthreads, unsigned short serverport) {
             
 
 			pthread_mutex_lock(&mucheck);
-		    add_to_queue(new_sock);
+		    add_to_queue(new_sock, client_address);
 			queue_count++;
 		/*	while (thread_count==max_threads) {
 				pthread_cond_wait(&connection, &mutex);
@@ -273,12 +282,14 @@ int main(int argc, char **argv) {
     }
 	max_threads = num_threads;
 
-	log = fopen("weblog.txt","a");	
+	log_file = fopen("weblog.txt","a");	
+
     runserver(num_threads, port);
-    pthread_mutex_destroy(&mucheck);
+    
+	pthread_mutex_destroy(&mucheck);
     pthread_cond_destroy(&connection);    
 	pthread_cond_destroy(&thread);
     fprintf(stderr, "Server done.\n");
-	fclose(log);
+	fclose(log_file);
     exit(0);
 }
