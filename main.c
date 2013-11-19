@@ -22,9 +22,12 @@ void signal_handler(int sig) {
 struct work_queue_item *head = NULL;
 struct work_queue_item *tail = NULL;
 pthread_mutex_t mucheck; 
-//pthread_mutex_t work_mutex;
-//pthread_mutex_t work_cond;
+pthread_cond_t thread, connection;
+
 int queue_count = 0;
+
+int thread_count = 0;
+int max_threads;
 
 //Carrie
 struct work_queue_item {
@@ -69,11 +72,16 @@ void add_to_queue(int new_sock) {
 }
 
 void * worker(void * arg) {
-	if(tail==NULL) {
-		//put thread to sleep
+
+
+	while (thread_count==0 && tail==NULL) {
+		pthread_cond_wait(&thread, &mucheck);
 	}
-	else { //a connection is waiting in the queue
+
+	 //a connection is waiting in the queue
+	while (queue_count>0) {
 		pthread_mutex_lock(&mucheck);
+		thread_count++;
 		struct work_queue_item * temp = tail;
 		if(head==tail) { //there is only 1 node
 			head->next= NULL;
@@ -94,6 +102,7 @@ void * worker(void * arg) {
 			tail = tail->previous;
 			tail->next = NULL;
 		}
+		queue_count--;
 		//node has now been removed
 		char * reqbuffer = NULL;
 		int buffsize = 1024;
@@ -105,13 +114,36 @@ void * worker(void * arg) {
 		//char * present_dir = pwd;
 		//int tot_size = strlen(reqbuffer) + strlen(present_dir);
 		FILE * file = fopen(reqbuffer, "r");
-		//if can open, concat with 202
-		//if can't, concat with 404
-		
+		int filename_length = strlen(reqbuffer);
+		if (file==NULL) { //cannot open, concat with 404--> make a fxn that does this
+			int http_length = strlen(HTTP_404);
+			senddata(temp->sock, HTTP_404, http_length);
+		}
+		else { //concat with 202.. send input from file to be concatenated
+			fseek(file, 0, SEEK_END);
+			int file_size = ftell(file);
+			int http_length = strlen(HTTP_200, file_size);
+			rewind(file);	
+			char * file_info = malloc(file_size*sizeof(char));
+			fread(file_info, sizeof(char), file_size, file);
+			fclose(file);
+			int total_size = file_size + http_length;
+			char * final_string = malloc(total_size*sizeof(char));
+			strcpy(final_string, (HTTP_200, file_size));
+			strcat(final_string, file_info);
+			senddata(temp->sock, final_string, total_size);
+			free(file_info);
+			free(final_string);
+		}
+
+
 		//now need thread to do something with reqbuffer
 		//add to output thing
 		//put thread back to sleep when finished
-		pthread_mutex_unlock(&mucheck);
+		close(temp->sock);
+		free(temp);
+		thread_count--;
+		pthread_mutex_unlock(&mucheck);	
 	}
 }
 
@@ -139,7 +171,7 @@ void runserver(int numthreads, unsigned short serverport) {
     pthread_t thread_arr[numthreads];
     int i = 0;
     for(;i<numthreads; i++) {
-    	pthread_create(&(thread_arr[i]), NULL, worker, 0);
+    	pthread_create(&(thread_arr[i]), NULL, worker, NULL);
     }
     //hypothetically, threads have now been initialized (with proper locks if need be)
  
@@ -186,35 +218,17 @@ void runserver(int numthreads, unsigned short serverport) {
             * when you're done.
             */
             
-            //adding a process to the waiting work_queue
-   	 //**Should I make this a loop for a series of processes?  Currently only accepting
-   	 //1 process at a time...
-            add_to_queue(new_sock);
-            //process has now been added to queue waiting for worker.
-            i = 0;
-            int thread_available = 0;
-            for(;i<numthreads; i++) { //if a thread is immediately available
-            	//if arr_threads[i] is waiting, unlock it and exit this loop
-            	//in same if statement, make thread_available=1;
-            }
-            if(thread_available == 1) {
-            	//pop tail off queue
-            	//give arr_threads[i] the socket from the tail
-            }
 
-    	/*
-    	after add to queue, kick a thread awake and pass it off
-    	will have to write code to implement what worker (thread) does
-    	*not passing socket directly, putting in linked list
-    	
-    	after main thread adds item to queue, signals worker queue.
-    	worker queue grabs mutex, grabs something off linked list (removes it)
-    	takes socket, reads request/ does it, then goes back and waits
-    	
-    	key is to coordinate producer consumer 
-    	*/
+			pthread_mutex_lock(&mucheck);
+		    add_to_queue(new_sock);
+			queue_count++;
+		/*	while (thread_count==max_threads) {
+				pthread_cond_wait(&connection, &mutex);
+			} */
+			pthread_cond_signal(&thread);
+			pthread_mutex_unlock(&mucheck);
 
-           ////////////////////////////////////////////////////////
+////////////////////////////////////////////////
 
 
         }
@@ -231,7 +245,9 @@ int main(int argc, char **argv) {
    // struct work_queue_item *head;
    // struct work_queue_item *tail;
    //pthread_mutex_t mucheck;
-   pthread_mutex_init(&mucheck, NULL); //initialize mutex to lock threads as
+   	pthread_mutex_init(&mucheck, NULL); //initialize mutex to lock threads as
+	pthread_cond_init(&connection, NULL);
+	pthread_cond_init(&thread, NULL);
    //they are created
     int c;
     while (-1 != (c = getopt(argc, argv, "hp:t:"))) {
@@ -255,9 +271,11 @@ int main(int argc, char **argv) {
                 break;
         }
     }
-
+	max_threads = num_threads;
     runserver(num_threads, port);
     pthread_mutex_destroy(&mucheck);
+    pthread_cond_destroy(&connection);    
+	pthread_cond_destroy(&thread);
     fprintf(stderr, "Server done.\n");
     exit(0);
 }
