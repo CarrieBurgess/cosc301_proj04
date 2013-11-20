@@ -1,3 +1,12 @@
+/*
+Who: Shreeya and Carrie
+What: Project 4, Concurrent Web Server
+When: 20 November 2013
+Where: somewhere, floating in virtual space
+Why: ....we have to.
+*/
+
+
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,8 +22,7 @@
 #include "network.h"
 
 
-// global variable; can't be avoided because
-// of asynchronous signal interaction
+//Global variables:
 int still_running = TRUE;
 void signal_handler(int sig) {
     still_running = FALSE;
@@ -29,14 +37,15 @@ int queue_count = 0;
 int thread_count = 0;
 int max_threads;
 
-//Carrie
+//Makes a queue item
 struct work_queue_item {
 	int sock;
-    struct sockaddr_in client_address; /////////////CARRIE... i added this for the log file..
+    struct sockaddr_in client_address;
 	struct work_queue_item *previous;	
 	struct work_queue_item *next;
 };
 
+//professor made function
 void usage(const char *progname) {
     fprintf(stderr, "usage: %s [-p port] [-t numthreads]\n", progname);
     fprintf(stderr, "\tport number defaults to 3000 if not specified.\n");
@@ -44,8 +53,8 @@ void usage(const char *progname) {
     exit(0);
 }
 
+//add an item to the queue (add to head)
 void add_to_queue(int new_sock, struct sockaddr_in input_client_address) {
-
 	struct work_queue_item * newitem = (struct work_queue_item *)malloc(sizeof(struct work_queue_item));
     	newitem->sock = new_sock; 
 	newitem->client_address = input_client_address; ////added for log file
@@ -74,65 +83,57 @@ void add_to_queue(int new_sock, struct sockaddr_in input_client_address) {
     	}
 }
 
+//take an item from the queue (remove from tail)
 struct work_queue_item * remove_tail() {
-
-		struct work_queue_item * temp = tail;
-		if(head==tail) { //there is only 1 node
-			head->next= NULL;
-			head->previous=NULL;
-			tail->next = NULL;
-			tail->previous= NULL;
-			head = NULL;
-			tail = NULL;
-		}
-		else if(tail->previous == head) { //there are only two nodes
-			tail->previous = NULL;
-			tail->next = NULL;
-			tail = head;
-			head->previous = NULL;
-			head->next = NULL;
-		}
-		else {
-			tail = tail->previous;
-			tail->next = NULL;
-		}
-		return temp;
-}
-void * worker(void * arg) {
-
-while(still_running) {	
-		pthread_mutex_lock(&mucheck);
-
-	while (thread_count==0 && tail==NULL) {
-		pthread_cond_wait(&thread, &mucheck);
+	struct work_queue_item * temp = tail;
+	if(head==tail) { //there is only 1 node
+		head->next= NULL;
+		head->previous=NULL;
+		tail->next = NULL;
+		tail->previous= NULL;
+		head = NULL;
+		tail = NULL;
 	}
+	else if(tail->previous == head) { //there are only two nodes
+		tail->previous = NULL;
+		tail->next = NULL;
+		tail = head;
+		head->previous = NULL;
+		head->next = NULL;
+	}
+	else {
+		tail = tail->previous;
+		tail->next = NULL;
+	}
+	return temp;
+}
 
-	 //a connection is waiting in the queue
-
+//This removes a tail from the queue to obtain necessary information, calls getrequest to get the reqbuffer, opens the file, and concatonates the necessary string.  This is then sent to senddata and added to a file called 'stuff'
+void * worker(void * arg) {
+	while(still_running) {	//while the server has not shut down
+		pthread_mutex_lock(&mucheck);
+		while (thread_count==0 && tail==NULL) { //if there is nothing in the queue, wait
+			pthread_cond_wait(&thread, &mucheck);
+		}
 		thread_count++;
-    		struct work_queue_item * temp = remove_tail();
+    		struct work_queue_item * temp = remove_tail(); //remove tail for connection info
 		pthread_mutex_unlock(&mucheck);	
 		queue_count--;
-		//node has now been removed
 		int buffersize = 1024;
 		char * reqbuffer = malloc(1024*sizeof(char));
 		int err = getrequest(temp->sock, reqbuffer, buffersize);
-	printf("after get request\n"); 
-		//is reqbuffer malloced?  do we have to free it? ******************************
+		printf("after get request\n"); 
 		if(err==-1) {
 			printf("Couldn't obtain file.\n");
 		}
-		//char * present_dir = pwd;
-		//int tot_size = strlen(reqbuffer) + strlen(present_dir);
 		FILE *file = NULL;
 		if (reqbuffer[0]=='/') 	file = fopen(reqbuffer+sizeof(char), "r");
 		else file = fopen(reqbuffer, "r");
-		//int filename_length = strlen(reqbuffer);
 		if (file==NULL) { //cannot open, concat with 404--> make a fxn that does this
 			int http_length = strlen(HTTP_404);
 			time_t now = time(NULL);
 			senddata(temp->sock, HTTP_404, http_length);
-            fprintf(log_file, "%s:%d  %s  'GET %s'  %d %d\n", inet_ntoa((temp->client_address).sin_addr), ntohs((temp->client_address).sin_port), ctime(&now), reqbuffer, 404, http_length);
+            		fprintf(log_file, "%s:%d  %s  'GET %s'  %d %d\n", inet_ntoa((temp->client_address).sin_addr), ntohs((temp->client_address).sin_port), ctime(&now), reqbuffer, 404, http_length);
 		}
 		else { //concat with 202.. send input from file to be concatenated
 			fseek(file, 0, SEEK_END);
@@ -154,48 +155,27 @@ while(still_running) {
 			free(file_info);
 			free(final_string);
 		}
-
 		free(reqbuffer);
-
 		//add to output thing
 		//put thread back to sleep when finished
 		close(temp->sock);
 		free(temp);
-		thread_count--;
-
-		
+		thread_count--;		
 	}
 	return NULL;
-
 }
 
-//Carrie and Shreeya
+
+//aside from the professor written code, this creates an array of threads.  A little further down,
+//this adds connections to the queue
 void runserver(int numthreads, unsigned short serverport) {
     //////////////////////////////////////////////////
-    
-    // create your pool of threads here
-    /*
-    before creating threads, need to create/ initialize condition variable,
-    mutex, and whatever other shared data worker threads need to wait on
-    	--> intiially, want workers to get started up then get stuck on some
-    	sort of condition variable
-    	 
-    want array of pthread_t to create pthreads
-    when create each of the threads, need seperate function for 
-    them to start up in
-    	-> this needs a particular signature to match pthread_t
-    	prolly takes void * and returns void *
-    	look at lab for creating threads
-    when go through for loop to create x number of worker threads
-    
-    */
     
     pthread_t thread_arr[numthreads];
     int i = 0;
     for(;i<numthreads; i++) {
     	pthread_create(&(thread_arr[i]), NULL, worker, NULL);
     }
-    //hypothetically, threads have now been initialized (with proper locks if need be)
  
     //////////////////////////////////////////////////
     
@@ -216,7 +196,8 @@ void runserver(int numthreads, unsigned short serverport) {
 
         if (prv == 0) {
             continue;
-        } else if (prv < 0) {
+        } 
+        else if (prv < 0) {
             PRINT_ERROR("poll");
             still_running = FALSE;
             continue;
@@ -231,32 +212,18 @@ void runserver(int numthreads, unsigned short serverport) {
             time_t now = time(NULL);
             fprintf(stderr, "Got connection from %s:%d at %s\n", inet_ntoa(client_address.sin_addr), ntohs(client_address.sin_port), ctime(&now));
 
-           ////////////////////////////////////////////////////////
-           /* You got a new connection.  Hand the connection off
-            * to one of the threads in the pool to process the
-            * request.
-            *
-            * Don't forget to close the socket (in the worker thread)
-            * when you're done.
-            */
-            
-
-			pthread_mutex_lock(&mucheck);
-		    add_to_queue(new_sock, client_address);
-			queue_count++;
-	
-			printf("before signal\n");
-			pthread_cond_signal(&thread);
-
-			printf("after signal\n");
-			
-			pthread_mutex_unlock(&mucheck);
-		}
-		printf("IM FREEEE\n");
-////////////////////////////////////////////////
-
-
-        
+           ////////////////////////////////////////////////////////            
+            pthread_mutex_lock(&mucheck);
+            add_to_queue(new_sock, client_address);
+            queue_count++;
+            printf("before signal\n");
+            pthread_cond_signal(&thread);
+            printf("after signal\n");
+            pthread_mutex_unlock(&mucheck);
+            }
+        printf("IM FREEEE\n");
+           ////////////////////////////////////////////////
+       
     }
 	i = 0;
 	for(;i<numthreads; i++) { 
@@ -269,16 +236,13 @@ void runserver(int numthreads, unsigned short serverport) {
 	
 }
 
+//mutexes and condition variables are initialized here
 int main(int argc, char **argv) {
     unsigned short port = 3000;
     int num_threads = 1;
-   // struct work_queue_item *head;
-   // struct work_queue_item *tail;
-   //pthread_mutex_t mucheck;
-   	pthread_mutex_init(&mucheck, NULL); //initialize mutex to lock threads as
-	pthread_cond_init(&connection, NULL);
-	pthread_cond_init(&thread, NULL);
-   //they are created
+    pthread_mutex_init(&mucheck, NULL);
+    pthread_cond_init(&connection, NULL);
+    pthread_cond_init(&thread, NULL);
     int c;
     while (-1 != (c = getopt(argc, argv, "hp:t:"))) {
         switch(c) {
@@ -301,16 +265,13 @@ int main(int argc, char **argv) {
                 break;
         }
     }
-	max_threads = num_threads;
-
-	log_file = fopen("weblog.txt","a");	
-
+    max_threads = num_threads;
+    log_file = fopen("weblog.txt","a");	
     runserver(num_threads, port);
-    
-	pthread_mutex_destroy(&mucheck);
+    pthread_mutex_destroy(&mucheck);
     pthread_cond_destroy(&connection);    
-	pthread_cond_destroy(&thread);
+    pthread_cond_destroy(&thread);
     fprintf(stderr, "Server done.\n");
-	fclose(log_file);
+    fclose(log_file);
     exit(0);
 }
