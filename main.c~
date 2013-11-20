@@ -32,7 +32,7 @@ int max_threads;
 //Carrie
 struct work_queue_item {
 	int sock;
-    struct sockaddr_in client_address;
+    struct sockaddr_in client_address; /////////////CARRIE... i added this for the log file..
 	struct work_queue_item *previous;	
 	struct work_queue_item *next;
 };
@@ -47,7 +47,7 @@ void usage(const char *progname) {
 void add_to_queue(int new_sock, struct sockaddr_in input_client_address) {
 	struct work_queue_item * newitem = (struct work_queue_item *)malloc(sizeof(struct work_queue_item));
     	newitem->sock = new_sock; 
-		newitem->client_address = input_client_address;
+		newitem->client_address = input_client_address; ////added for log file
   	if(head==NULL && tail==NULL) { //1st node
     		head = newitem;
     		head->next = NULL;
@@ -82,7 +82,7 @@ void * worker(void * arg) {
 
 	 //a connection is waiting in the queue
 	while (queue_count>0) {
-		pthread_mutex_lock(&mucheck);
+		//pthread_mutex_lock(&mucheck);
 		thread_count++;
 		struct work_queue_item * temp = tail;
 		if(head==tail) { //there is only 1 node
@@ -126,7 +126,7 @@ void * worker(void * arg) {
 		else { //concat with 202.. send input from file to be concatenated
 			fseek(file, 0, SEEK_END);
 			int file_size = ftell(file);
-			char * http = HTTP_200;
+			char * http = HTTP_200; ///shouldn't be this but i just changed in into this cuz i didn't want error during run.. the program gets hanged so we have to debug it...
 			//int http_length = strlen(HTTP_200, file_size);
 			int http_length = strlen(http);
 			rewind(file);	
@@ -151,7 +151,7 @@ void * worker(void * arg) {
 		close(temp->sock);
 		free(temp);
 		thread_count--;
-		pthread_mutex_unlock(&mucheck);	
+		//pthread_mutex_unlock(&mucheck);	
 	}
 	return NULL;
 }

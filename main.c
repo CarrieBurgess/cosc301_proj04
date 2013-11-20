@@ -82,7 +82,7 @@ void * worker(void * arg) {
 
 	 //a connection is waiting in the queue
 	while (queue_count>0) {
-		pthread_mutex_lock(&mucheck);
+		//pthread_mutex_lock(&mucheck);
 		thread_count++;
 		struct work_queue_item * temp = tail;
 		if(head==tail) { //there is only 1 node
@@ -151,7 +151,7 @@ void * worker(void * arg) {
 		close(temp->sock);
 		free(temp);
 		thread_count--;
-		pthread_mutex_unlock(&mucheck);	
+		//pthread_mutex_unlock(&mucheck);	
 	}
 	return NULL;
 }
@@ -241,6 +241,10 @@ void runserver(int numthreads, unsigned short serverport) {
 
 
         }
+    }
+	i = 0;
+	for(;i<numthreads; i++) {
+    	pthread_join((thread_arr[i]), NULL);
     }
     fprintf(stderr, "Server shutting down.\n");
         
