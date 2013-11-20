@@ -123,7 +123,6 @@ void * worker(void * arg) {
 		int buffersize = 1024;
 		char * reqbuffer = malloc(1024*sizeof(char));
 		int err = getrequest(temp->sock, reqbuffer, buffersize);
-		printf("after get request\n"); 
 		if(err==-1) {
 			printf("Couldn't obtain file.\n");
 		}
@@ -141,11 +140,8 @@ void * worker(void * arg) {
 			
 			fseek(file, 0, SEEK_END);
 			int file_size = ftell(file);
-		//	char * http = HTTP_200; ///shouldn't be this but i just changed in into this cuz i didn't want error during run.. the program gets hanged so we have to debug it...
-			//int http_length = strlen(HTTP_200, file_size);
 			char http[128];
 			snprintf(http, 128, HTTP_200, file_size);
-			printf("%s\n", http);
 			int http_length = strlen(http);
 			rewind(file);			
 				
@@ -154,22 +150,12 @@ void * worker(void * arg) {
 			while(fread(file_info, sizeof(char), 1024, file)!=0) {
 				senddata(temp->sock, file_info, 1024);
 			}
-			
-		//	fread(file_info, sizeof(char), file_size, file);
 			fclose(file);
 			int total_size = file_size + http_length;
-		//	char * final_string = malloc(total_size*sizeof(char));
-		//	strcpy(final_string, http);
-		//	strcat(final_string, file_info);
 			time_t now = time(NULL);
-		//	senddata(temp->sock, final_string, total_size);
 			fprintf(log_file, "%s:%d  %s  'GET %s'  %d %d\n", inet_ntoa((temp->client_address).sin_addr), ntohs((temp->client_address).sin_port), ctime(&now), reqbuffer, 200, total_size);
-		//	free(file_info);
-		//	free(final_string);
 		}
 		free(reqbuffer);
-		//add to output thing
-		//put thread back to sleep when finished
 		close(temp->sock);
 		free(temp);
 		thread_count--;		
@@ -228,20 +214,16 @@ void runserver(int numthreads, unsigned short serverport) {
             pthread_mutex_lock(&mucheck);
             add_to_queue(new_sock, client_address);
             queue_count++;
-            printf("before signal\n");
             pthread_cond_signal(&thread);
-            printf("after signal\n");
             pthread_mutex_unlock(&mucheck);
             }
-        printf("IM FREEEE\n");
            ////////////////////////////////////////////////
        
     }
 	i = 0;
 	pthread_cond_broadcast(&thread); //wake all up
-	for(;i<numthreads; i++) { 
-			printf("in join\n");
-    	pthread_join((thread_arr[i]), NULL);
+	for(;i<numthreads; i++) { ;
+    		pthread_join((thread_arr[i]), NULL);
     	}	
     fprintf(stderr, "Server shutting down.\n");
         

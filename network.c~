@@ -118,10 +118,10 @@ int getrequest(int sock, char *reqbuffer, int buffsize) {
                 }
             }
         }
-					printf("get request: after while loop t\n"); 
+
         t = strtok(NULL, newline);
     }
-
+					printf("get request: after while loop t\n"); 
     return returnval;
 }
 

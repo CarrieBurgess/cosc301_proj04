@@ -69,7 +69,6 @@ int getrequest(int sock, char *reqbuffer, int buffsize) {
     gettimeofday(&begin, NULL);
 
     while (TRUE) {
-					printf("get request: in while loop\n");
         struct pollfd pfd = {sock, POLLIN};
         int rv = poll(&pfd, 1, (wait_time*1000)/10);
         if (rv < 0) {
@@ -85,7 +84,6 @@ int getrequest(int sock, char *reqbuffer, int buffsize) {
                 }
             }
         }
-					printf("get request: out of while loop\n");
         // have we waited too long for the request?
         gettimeofday(&end, NULL);
         timersub(&end, &begin, &diff);
@@ -103,7 +101,6 @@ int getrequest(int sock, char *reqbuffer, int buffsize) {
     char *t = strtok(buffer, newline);
     while (t != NULL) {
         // does this look like the main request line?
-					printf("get request: in while loop t\n");
         char *proto = strstr(t, "HTTP/1.");
         if (proto != NULL) {
             // request type should be at the beginning of this line.
@@ -112,7 +109,6 @@ int getrequest(int sock, char *reqbuffer, int buffsize) {
                 char *first_space = index(t, ' ');
                 if (first_space != NULL) {
                     first_space += 1;
-					printf("get request: before strncpy\n");
                     strncpy(reqbuffer, first_space, MIN(buffsize, (proto - first_space - 1)));
                     returnval = 0;
                 }
@@ -121,7 +117,6 @@ int getrequest(int sock, char *reqbuffer, int buffsize) {
 
         t = strtok(NULL, newline);
     }
-					printf("get request: after while loop t\n"); 
     return returnval;
 }
 

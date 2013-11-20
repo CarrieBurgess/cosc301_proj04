@@ -163,7 +163,7 @@ void * worker(void * arg) {
 		//	strcat(final_string, file_info);
 			time_t now = time(NULL);
 		//	senddata(temp->sock, final_string, total_size);
-			fprintf(log_file, "%s:%d  %s  'GET %s'  %d %d", inet_ntoa((temp->client_address).sin_addr), ntohs((temp->client_address).sin_port), ctime(&now), reqbuffer, 200, total_size);
+			fprintf(log_file, "%s:%d  %s  'GET %s'  %d %d\n", inet_ntoa((temp->client_address).sin_addr), ntohs((temp->client_address).sin_port), ctime(&now), reqbuffer, 200, total_size);
 		//	free(file_info);
 		//	free(final_string);
 		}
