@@ -103,6 +103,7 @@ int getrequest(int sock, char *reqbuffer, int buffsize) {
     char *t = strtok(buffer, newline);
     while (t != NULL) {
         // does this look like the main request line?
+					printf("get request: in while loop t\n");
         char *proto = strstr(t, "HTTP/1.");
         if (proto != NULL) {
             // request type should be at the beginning of this line.
@@ -116,10 +117,11 @@ int getrequest(int sock, char *reqbuffer, int buffsize) {
                     returnval = 0;
                 }
             }
-        } 
+        }
+
         t = strtok(NULL, newline);
     }
-
+					printf("get request: after while loop t\n"); 
     return returnval;
 }
 

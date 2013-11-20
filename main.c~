@@ -45,9 +45,10 @@ void usage(const char *progname) {
 }
 
 void add_to_queue(int new_sock, struct sockaddr_in input_client_address) {
+	pthread_mutex_lock(&mucheck); //////////////added
 	struct work_queue_item * newitem = (struct work_queue_item *)malloc(sizeof(struct work_queue_item));
     	newitem->sock = new_sock; 
-		newitem->client_address = input_client_address; ////added for log file
+	newitem->client_address = input_client_address; ////added for log file
   	if(head==NULL && tail==NULL) { //1st node
     		head = newitem;
     		head->next = NULL;
@@ -71,19 +72,11 @@ void add_to_queue(int new_sock, struct sockaddr_in input_client_address) {
     		head->previous = newitem;
     		head = newitem;
     	}
+pthread_mutex_unlock(&mucheck); /////////added
 }
 
-void * worker(void * arg) {
+struct work_queue_item * remove_tail() {
 
-
-	while (thread_count==0 && tail==NULL) {
-		pthread_cond_wait(&thread, &mucheck);
-	}
-
-	 //a connection is waiting in the queue
-	while (queue_count>0) {
-		//pthread_mutex_lock(&mucheck);
-		thread_count++;
 		struct work_queue_item * temp = tail;
 		if(head==tail) { //there is only 1 node
 			head->next= NULL;
@@ -104,19 +97,38 @@ void * worker(void * arg) {
 			tail = tail->previous;
 			tail->next = NULL;
 		}
+		return temp;
+}
+void * worker(void * arg) {
+
+while(still_running) {	
+		pthread_mutex_lock(&mucheck);
+
+	while (thread_count==0 && tail==NULL) {
+		pthread_cond_wait(&thread, &mucheck);
+	}
+
+	 //a connection is waiting in the queue
+
+		thread_count++;
+    		struct work_queue_item * temp = remove_tail();
+		pthread_mutex_unlock(&mucheck);	
 		queue_count--;
 		//node has now been removed
-		char * reqbuffer = NULL;
-		int buffsize = 1024;
-		int err = getrequest(temp->sock, reqbuffer, buffsize);
+		int buffersize = 1024;
+		char * reqbuffer = malloc(1024*sizeof(char));
+		int err = getrequest(temp->sock, reqbuffer, buffersize);
+	printf("after get request\n"); 
 		//is reqbuffer malloced?  do we have to free it? ******************************
 		if(err==-1) {
 			printf("Couldn't obtain file.\n");
 		}
 		//char * present_dir = pwd;
 		//int tot_size = strlen(reqbuffer) + strlen(present_dir);
-		FILE * file = fopen(reqbuffer, "r");
-		int filename_length = strlen(reqbuffer);
+		FILE *file = NULL;
+		if (reqbuffer[0]=='/') 	file = fopen(reqbuffer+sizeof(char), "r");
+		else file = fopen(reqbuffer, "r");
+		//int filename_length = strlen(reqbuffer);
 		if (file==NULL) { //cannot open, concat with 404--> make a fxn that does this
 			int http_length = strlen(HTTP_404);
 			time_t now = time(NULL);
@@ -151,9 +163,11 @@ void * worker(void * arg) {
 		close(temp->sock);
 		free(temp);
 		thread_count--;
-		//pthread_mutex_unlock(&mucheck);	
+
+		
 	}
 	return NULL;
+
 }
 
 //Carrie and Shreeya
@@ -231,22 +245,30 @@ void runserver(int numthreads, unsigned short serverport) {
 			pthread_mutex_lock(&mucheck);
 		    add_to_queue(new_sock, client_address);
 			queue_count++;
-		/*	while (thread_count==max_threads) {
-				pthread_cond_wait(&connection, &mutex);
-			} */
+	
+			printf("before signal\n");
 			pthread_cond_signal(&thread);
-			pthread_mutex_unlock(&mucheck);
 
+			printf("after signal\n");
+			
+			pthread_mutex_unlock(&mucheck);
+		}
+		printf("IM FREEEE\n");
 ////////////////////////////////////////////////
 
 
-        }
+        
     }
+	i = 0;
+	for(;i<numthreads; i++) { 
+			printf("in join\n");
+    	pthread_join((thread_arr[i]), NULL);
+    	}	
     fprintf(stderr, "Server shutting down.\n");
         
     close(main_socket);
+	
 }
-
 
 int main(int argc, char **argv) {
     unsigned short port = 3000;
